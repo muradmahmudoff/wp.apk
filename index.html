@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ChatAZ</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+:root{
+  --green:#25D366;--green-d:#1DA851;--bubble-out:#d9fdd3;
+  --teal:#128C7E;--teal-d:#075E54;
+  --bg:#f0f2f5;--sbg:#fff;--cbg:#efeae2;--ibg:#fff;
+  --bin:#fff;--bout:#d9fdd3;
+  --txt:#111b21;--muted:#667781;--border:rgba(0,0,0,0.08);
+  --sh:0 1px 2px rgba(0,0,0,0.1);
+  --font:'Plus Jakarta Sans',sans-serif;
+}
+[data-dark]{
+  --bg:#111b21;--sbg:#1f2c34;--cbg:#0b141a;--ibg:#1f2c34;
+  --bin:#1f2c34;--bout:#005c4b;
+  --txt:#e9edef;--muted:#8696a0;--border:rgba(255,255,255,0.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--txt);}
+
+/* Login screen */
+#loginScreen{
+  height:100vh;display:flex;align-items:center;justify-content:center;
+  background:var(--bg);
+}
+.login-card{
+  background:var(--sbg);border-radius:16px;padding:40px 36px;
+  box-shadow:0 4px 24px rgba(0,0,0,0.12);width:340px;text-align:center;
+}
+.login-logo{
+  width:72px;height:72px;border-radius:50%;background:var(--teal-d);
+  display:flex;align-items:center;justify-content:center;margin:0 auto 20px;
+}
+.login-card h1{font-size:22px;font-weight:600;margin-bottom:6px;}
+.login-card p{font-size:14px;color:var(--muted);margin-bottom:28px;}
+.color-picks{display:flex;gap:10px;justify-content:center;margin-bottom:20px;flex-wrap:wrap;}
+.color-pick{
+  width:28px;height:28px;border-radius:50%;cursor:pointer;border:3px solid transparent;
+  transition:transform .15s,border-color .15s;
+}
+.color-pick.sel{border-color:var(--txt);transform:scale(1.15);}
+.login-input{
+  width:100%;border:1.5px solid var(--border);border-radius:10px;
+  padding:11px 14px;font-family:var(--font);font-size:15px;
+  background:var(--bg);color:var(--txt);outline:none;margin-bottom:14px;
+  transition:border-color .2s;
+}
+.login-input:focus{border-color:var(--green);}
+.login-btn{
+  width:100%;background:var(--green);color:#fff;border:none;
+  border-radius:10px;padding:12px;font-family:var(--font);font-size:15px;
+  font-weight:600;cursor:pointer;transition:background .15s;
+}
+.login-btn:hover{background:var(--green-d);}
+
+/* App shell */
+#app{display:none;height:100vh;flex-direction:column;}
+#app.show{display:flex;}
+.shell{display:flex;flex:1;overflow:hidden;}
+
+/* Sidebar */
+.sb{width:300px;min-width:260px;background:var(--sbg);display:flex;flex-direction:column;border-right:1px solid var(--border);}
+.sb-head{background:var(--teal-d);padding:10px 14px;display:flex;align-items:center;gap:10px;}
+.my-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff;flex-shrink:0;}
+.my-name{flex:1;color:#fff;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hbtn{width:34px;height:34px;border-radius:50%;background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.8);display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
+.hbtn:hover{background:rgba(255,255,255,0.12);}
+
+.sb-tabs{display:flex;border-bottom:1px solid var(--border);}
+.tab{flex:1;padding:11px;text-align:center;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:color .15s,border-color .15s;}
+.tab.act{color:var(--green);border-color:var(--green);}
+
+.sb-search{padding:8px 12px;border-bottom:1px solid var(--border);}
+.sw{background:var(--bg);border-radius:8px;display:flex;align-items:center;gap:8px;padding:7px 10px;}
+.sw svg{color:var(--muted);flex-shrink:0;}
+.sw input{border:none;background:none;font-family:var(--font);font-size:13px;color:var(--txt);outline:none;width:100%;}
+.sw input::placeholder{color:var(--muted);}
+
+.list{flex:1;overflow-y:auto;}
+.list::-webkit-scrollbar{width:3px;}
+.list::-webkit-scrollbar-thumb{background:var(--border);}
+
+.ci{display:flex;align-items:center;gap:11px;padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s;position:relative;}
+.ci:hover,.ci.act{background:var(--bg);}
+.ci.act::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--green);}
+.av{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;flex-shrink:0;position:relative;}
+.od{position:absolute;bottom:1px;right:1px;width:11px;height:11px;border-radius:50%;background:var(--green);border:2px solid var(--sbg);}
+.ci-b{flex:1;min-width:0;}
+.ci-t{display:flex;justify-content:space-between;align-items:baseline;}
+.ci-n{font-size:14px;font-weight:600;}
+.ci-tm{font-size:11px;color:var(--muted);}
+.ci-prev{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bdg{background:var(--green);color:#fff;border-radius:50%;min-width:20px;height:20px;padding:0 4px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-left:4px;flex-shrink:0;}
+
+/* Chat */
+.chat{flex:1;display:flex;flex-direction:column;background:var(--cbg);position:relative;}
+.chat::before{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='30' cy='30' r='28' fill='none' stroke='%23128C7E' stroke-width='0.3' opacity='0.1'/%3E%3C/svg%3E");pointer-events:none;z-index:0;}
+.ch-head{background:var(--teal-d);padding:10px 14px;display:flex;align-items:center;gap:10px;z-index:2;position:relative;}
+.ch-info{flex:1;}
+.ch-n{font-size:14px;font-weight:600;color:#fff;}
+.ch-s{font-size:12px;color:rgba(255,255,255,0.7);}
+.ch-s.typ{color:#a8f0d0;}
+
+.msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:2px;z-index:1;position:relative;}
+.msgs::-webkit-scrollbar{width:4px;}
+.msgs::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.12);}
+
+.dchip{align-self:center;background:rgba(255,255,255,0.82);color:#667781;border-radius:8px;padding:3px 12px;font-size:11.5px;font-weight:500;margin:6px 0;backdrop-filter:blur(4px);}
+[data-dark] .dchip{background:rgba(255,255,255,0.1);color:#8696a0;}
+.sysm{align-self:center;font-size:12px;color:var(--muted);margin:4px 0;font-style:italic;}
+
+.mr{display:flex;margin-bottom:2px;}
+.mr.out{justify-content:flex-end;}
+.mr.in{justify-content:flex-start;}
+.bub{max-width:68%;padding:7px 11px 5px;border-radius:8px;font-size:14px;line-height:1.5;box-shadow:var(--sh);word-break:break-word;animation:pop .18s ease;}
+@keyframes pop{from{opacity:0;transform:scale(0.95) translateY(3px);}to{opacity:1;transform:none;}}
+.mr.out .bub{background:var(--bout);border-bottom-right-radius:2px;color:#111b21;}
+.mr.in .bub{background:var(--bin);border-bottom-left-radius:2px;color:var(--txt);}
+.bub-sender{font-size:11px;font-weight:600;margin-bottom:3px;}
+.bub-meta{display:flex;align-items:center;justify-content:flex-end;gap:3px;margin-top:2px;font-size:11px;color:var(--muted);}
+.ticks{color:#53bdeb;font-size:12px;}
+.typ-row{display:flex;margin:4px 0;}
+.typ-bub{background:var(--bin);border-radius:8px;border-bottom-left-radius:2px;padding:11px 14px;box-shadow:var(--sh);display:none;align-items:center;gap:4px;}
+.typ-bub.show{display:flex;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:td 1.2s infinite ease-in-out;}
+.dot:nth-child(2){animation-delay:.2s;}
+.dot:nth-child(3){animation-delay:.4s;}
+@keyframes td{0%,80%,100%{transform:scale(.7);opacity:.4;}40%{transform:scale(1);opacity:1;}}
+
+.ib{background:var(--ibg);padding:8px 12px;display:flex;align-items:flex-end;gap:8px;z-index:2;position:relative;border-top:1px solid var(--border);}
+.ebtn,.abtn{width:38px;height:38px;border-radius:50%;background:none;border:none;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:color .15s;}
+.ebtn:hover,.abtn:hover{color:var(--txt);}
+.iw{flex:1;background:var(--bg);border-radius:22px;display:flex;align-items:flex-end;padding:6px 14px;}
+textarea{flex:1;border:none;background:none;font-family:var(--font);font-size:14.5px;color:var(--txt);resize:none;outline:none;max-height:110px;line-height:1.5;}
+textarea::placeholder{color:var(--muted);}
+.sbtn{width:42px;height:42px;border-radius:50%;background:var(--green);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,transform .1s;}
+.sbtn:hover{background:var(--green-d);}
+.sbtn:active{transform:scale(.92);}
+
+/* Empty */
+.empty{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center;z-index:1;position:relative;}
+.empty-ic{width:72px;height:72px;border-radius:50%;background:rgba(37,211,102,.12);display:flex;align-items:center;justify-content:center;}
+.empty h2{font-size:20px;font-weight:600;}
+.empty p{font-size:13px;color:var(--muted);max-width:260px;}
+
+/* Notification toast */
+.toast{
+  position:fixed;top:16px;right:16px;z-index:999;
+  background:var(--teal-d);color:#fff;border-radius:10px;
+  padding:10px 16px;font-size:13px;font-weight:500;
+  box-shadow:0 4px 16px rgba(0,0,0,0.2);
+  transform:translateY(-60px);opacity:0;transition:all .3s;pointer-events:none;
+}
+.toast.show{transform:translateY(0);opacity:1;}
+
+@media(max-width:660px){
+  .sb{position:fixed;left:0;top:0;bottom:0;z-index:100;transform:translateX(-100%);transition:transform .25s;width:280px;}
+  .sb.open{transform:none;}
+  .menu-btn{display:flex!important;}
+}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg width="36" height="36" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </div>
+    <h1>ChatAZ</h1>
+    <p>Adınızı daxil edin və danışmağa başlayın</p>
+    <div class="color-picks" id="colorPicks"></div>
+    <input class="login-input" id="usernameInput" placeholder="Adınız..." maxlength="20" />
+    <button class="login-btn" onclick="doLogin()">Daxil ol →</button>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <div class="shell">
+    <!-- Sidebar -->
+    <div class="sb" id="sidebar">
+      <div class="sb-head">
+        <div class="my-av" id="myAv"></div>
+        <span class="my-name" id="myName"></span>
+        <button class="hbtn" onclick="toggleDark()" title="Tema">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button class="hbtn" onclick="leaveApp()" title="Çıx">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+      <div class="sb-tabs">
+        <div class="tab act" id="tabUsers" onclick="switchTab('users')">İstifadəçilər</div>
+        <div class="tab" id="tabRooms" onclick="switchTab('rooms')">Otaqlar</div>
+      </div>
+      <div class="sb-search">
+        <div class="sw">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" placeholder="Axtar..." id="searchInput" oninput="doSearch(this.value)"/>
+        </div>
+      </div>
+      <div class="list" id="listPanel"></div>
+    </div>
+
+    <!-- Chat -->
+    <div class="chat" id="chatPanel">
+      <div class="empty">
+        <div class="empty-ic">
+          <svg width="32" height="32" fill="none" stroke="#25D366" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h2>ChatAZ</h2>
+        <p>Sol paneldən istifadəçi və ya otaq seçin</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const COLORS = ['#128C7E','#1565C0','#AD1457','#6A1B9A','#E65100','#2E7D32','#D84315','#00695C'];
+let selColor = COLORS[0];
+let me = null;
+let socket = null;
+let activeChat = null; // { type:'user'|'room', name, display }
+let unread = {};
+let typingTimer = null;
+let onlineUsers = [];
+let currentTab = 'users';
+
+// Color picker
+const cp = document.getElementById('colorPicks');
+COLORS.forEach(c => {
+  const d = document.createElement('div');
+  d.className = 'color-pick' + (c === selColor ? ' sel' : '');
+  d.style.background = c;
+  d.onclick = () => { selColor = c; document.querySelectorAll('.color-pick').forEach(x=>x.classList.remove('sel')); d.classList.add('sel'); };
+  cp.appendChild(d);
+});
+
+document.getElementById('usernameInput').onkeydown = e => { if(e.key==='Enter') doLogin(); };
+
+function doLogin() {
+  const name = document.getElementById('usernameInput').value.trim();
+  if (!name) return;
+  me = { username: name, color: selColor, avatar: name.slice(0,2).toUpperCase() };
+
+  document.getElementById('myAv').textContent = me.avatar;
+  document.getElementById('myAv').style.background = me.color;
+  document.getElementById('myName').textContent = me.username;
+
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').classList.add('show');
+
+  connectSocket();
+}
+
+function connectSocket() {
+  socket = io();
+
+  socket.on('connect', () => {
+    socket.emit('join', { username: me.username, color: me.color });
+    // Auto-join general room
+    socket.emit('join_room', 'Ümumi');
+  });
+
+  socket.on('users', (users) => {
+    onlineUsers = users.filter(u => u.username !== me.username);
+    renderList();
+  });
+
+  socket.on('system', ({ text, time }) => {
+    appendSystem(text);
+  });
+
+  socket.on('room_history', ({ room, messages }) => {
+    if (activeChat && activeChat.type === 'room' && activeChat.name === room) {
+      const msgs = document.getElementById('msgs');
+      if (msgs) {
+        msgs.innerHTML = '<div class="dchip">Bu gün</div>';
+        messages.forEach(m => appendMsg(m, m.sender === me.username));
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+    }
+  });
+
+  socket.on('room_msg', ({ room, msg }) => {
+    if (activeChat && activeChat.type === 'room' && activeChat.name === room) {
+      appendMsg(msg, msg.sender === me.username);
+      updateStatus(msg.sender + ' yazdı');
+    } else {
+      if (!unread[room]) unread[room] = 0;
+      unread[room]++;
+      renderList();
+      showToast(`${room}: ${msg.sender}: ${msg.text.slice(0,30)}`);
+    }
+  });
+
+  socket.on('private_msg', ({ with: withUser, msg }) => {
+    const other = msg.sender === me.username ? withUser : msg.sender;
+    if (activeChat && activeChat.type === 'user' && activeChat.name === other) {
+      appendMsg(msg, msg.sender === me.username);
+    } else if (msg.sender !== me.username) {
+      if (!unread[other]) unread[other] = 0;
+      unread[other]++;
+      renderList();
+    }
+  });
+
+  socket.on('private_history', ({ with: withUser, messages }) => {
+    if (activeChat && activeChat.type === 'user' && activeChat.name === withUser) {
+      const msgs = document.getElementById('msgs');
+      if (msgs) {
+        msgs.innerHTML = '<div class="dchip">Bu gün</div>';
+        messages.forEach(m => appendMsg(m, m.sender === me.username));
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+    }
+  });
+
+  socket.on('notification', ({ from, text }) => {
+    showToast(`${from}: ${text.slice(0,40)}`);
+  });
+
+  socket.on('typing', ({ from, room, private: priv }) => {
+    if (activeChat) {
+      if (activeChat.type === 'room' && room === activeChat.name && from !== me.username) showTyping(true, from);
+      if (activeChat.type === 'user' && priv && from === activeChat.name) showTyping(true, from);
+    }
+    setTimeout(() => showTyping(false), 2000);
+  });
+}
+
+const ROOMS = ['Ümumi', 'Texnologiya', 'Əyləncə', 'Müzakirə'];
+
+function renderList() {
+  const panel = document.getElementById('listPanel');
+  panel.innerHTML = '';
+  const search = document.getElementById('searchInput').value.toLowerCase();
+
+  if (currentTab === 'users') {
+    // AI Bot first
+    if ('ai köməkçi'.includes(search) || !search) {
+      const ai = createItem({ username: 'AI Köməkçi', avatar: 'AI', color: '#128C7E', online: true }, 'user', 'AI Köməkçi');
+      panel.appendChild(ai);
+    }
+    onlineUsers.filter(u => u.username.toLowerCase().includes(search)).forEach(u => {
+      panel.appendChild(createItem(u, 'user', u.username));
+    });
+    if (onlineUsers.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:24px;text-align:center;font-size:13px;color:var(--muted);';
+      empty.textContent = 'Hələ ki heç kim yoxdur...';
+      panel.appendChild(empty);
+    }
+  } else {
+    ROOMS.filter(r => r.toLowerCase().includes(search)).forEach(r => {
+      const fakeUser = { username: r, avatar: r.slice(0,2).toUpperCase(), color: '#128C7E', online: true };
+      panel.appendChild(createItem(fakeUser, 'room', r));
+    });
+  }
+}
+
+function createItem(u, type, chatName) {
+  const isActive = activeChat && activeChat.name === chatName;
+  const el = document.createElement('div');
+  el.className = 'ci' + (isActive ? ' act' : '');
+  const ubadge = unread[chatName] || 0;
+  el.innerHTML = `
+    <div class="av" style="background:${u.color}20;color:${u.color};">
+      ${u.avatar || u.username.slice(0,2).toUpperCase()}
+      ${u.online ? '<div class="od"></div>' : ''}
+    </div>
+    <div class="ci-b">
+      <div class="ci-t">
+        <span class="ci-n">${u.username}</span>
+        <span class="ci-tm" style="${ubadge?'color:var(--green)':''}">İndi</span>
+      </div>
+      <div style="display:flex;align-items:center;">
+        <span class="ci-prev">${type==='room'?'#'+chatName+' otağı':'Xüsusi söhbət'}</span>
+        ${ubadge ? `<span class="bdg">${ubadge}</span>` : ''}
+      </div>
+    </div>
+  `;
+  el.onclick = () => openChat(type, chatName, u);
+  return el;
+}
+
+function openChat(type, name, userInfo) {
+  activeChat = { type, name, display: userInfo.username, color: userInfo.color, avatar: userInfo.avatar };
+  unread[name] = 0;
+  renderList();
+
+  const panel = document.getElementById('chatPanel');
+  panel.innerHTML = `
+    <div class="ch-head">
+      <div class="av" style="background:${userInfo.color}30;color:${userInfo.color};cursor:pointer;">${userInfo.avatar}</div>
+      <div class="ch-info">
+        <div class="ch-n">${type==='room'?'# '+name:name}</div>
+        <div class="ch-s" id="chatSt">${type==='room'?'Qrup otağı':'onlayn'}</div>
+      </div>
+      <button class="hbtn" style="color:rgba(255,255,255,0.8);" onclick="document.getElementById('sidebar').classList.toggle('open')">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+    </div>
+    <div class="msgs" id="msgs"><div class="dchip">Bu gün</div></div>
+    <div class="typ-row"><div class="typ-bub" id="typBub"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>
+    <div class="ib">
+      <button class="ebtn" onclick="insertEmoji()">
+        <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 13s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+      </button>
+      <div class="iw"><textarea id="msgInput" rows="1" placeholder="Mesaj yazın..." oninput="onInput(this)" onkeydown="handleKey(event)"></textarea></div>
+      <button class="sbtn" onclick="sendMsg()">
+        <svg width="20" height="20" fill="white" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </div>
+  `;
+
+  // Load history
+  if (type === 'room') {
+    socket.emit('join_room', name);
+  } else if (name === 'AI Köməkçi') {
+    setTimeout(() => appendMsg({ sender: 'AI Köməkçi', avatar: 'AI', color: '#128C7E', text: 'Salam! 👋 Mən AI Köməkçiyəm. Necə kömək edə bilərəm?', time: getTime() }, false), 300);
+  } else {
+    socket.emit('get_private_history', { withUsername: name });
+  }
+}
+
+// AI conversation history per user
+const aiHistory = [];
+
+async function sendMsg() {
+  const input = document.getElementById('msgInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  autoResize(input);
+
+  const msg = { sender: me.username, avatar: me.avatar, color: me.color, text, time: getTime() };
+  appendMsg(msg, true);
+
+  if (activeChat.type === 'room') {
+    socket.emit('room_msg', { room: activeChat.name, text });
+  } else if (activeChat.name === 'AI Köməkçi') {
+    showTyping(true, 'AI Köməkçi');
+    aiHistory.push({ role: 'user', content: text });
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: 'Sən ChatAZ adlı mesajlaşma proqramında AI söhbət tərəfdaşısan. Qısa, mehriban, natural cavablar ver. Azərbaycan dilini üstün tut. Danışıq tərzi işlət.',
+          messages: aiHistory
+        })
+      });
+      const data = await res.json();
+      const reply = data.content?.map(i=>i.text||'').join('') || 'Cavab alınmadı.';
+      aiHistory.push({ role: 'assistant', content: reply });
+      showTyping(false);
+      appendMsg({ sender: 'AI Köməkçi', avatar: 'AI', color: '#128C7E', text: reply, time: getTime() }, false);
+    } catch {
+      showTyping(false);
+      appendMsg({ sender: 'AI Köməkçi', avatar: 'AI', color: '#128C7E', text: '❌ Xəta baş verdi.', time: getTime() }, false);
+    }
+  } else {
+    socket.emit('private_msg', { toUsername: activeChat.name, text });
+  }
+}
+
+function appendMsg(msg, isOut) {
+  const msgs = document.getElementById('msgs');
+  if (!msgs) return;
+  const row = document.createElement('div');
+  row.className = 'mr ' + (isOut ? 'out' : 'in');
+  row.innerHTML = `
+    <div class="bub">
+      ${!isOut ? `<div class="bub-sender" style="color:${msg.color}">${msg.sender}</div>` : ''}
+      ${msg.text.replace(/\n/g,'<br>')}
+      <div class="bub-meta">
+        <span>${msg.time}</span>
+        ${isOut ? '<span class="ticks">✓✓</span>' : ''}
+      </div>
+    </div>`;
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function appendSystem(text) {
+  const msgs = document.getElementById('msgs');
+  if (!msgs) return;
+  const el = document.createElement('div');
+  el.className = 'sysm';
+  el.textContent = text;
+  msgs.appendChild(el);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping(show, from) {
+  const tb = document.getElementById('typBub');
+  if (!tb) return;
+  tb.className = 'typ-bub' + (show ? ' show' : '');
+  const st = document.getElementById('chatSt');
+  if (st) {
+    st.textContent = show ? (from + ' yazır...') : (activeChat?.type==='room' ? 'Qrup otağı' : 'onlayn');
+    st.className = 'ch-s' + (show ? ' typ' : '');
+  }
+  if (show) { const m=document.getElementById('msgs'); if(m) m.scrollTop=m.scrollHeight; }
+}
+
+function updateStatus(txt) {
+  const st = document.getElementById('chatSt');
+  if (st) { st.textContent = txt; setTimeout(()=>{ if(st) st.textContent = activeChat?.type==='room'?'Qrup otağı':'onlayn'; }, 2000); }
+}
+
+function onInput(el) {
+  autoResize(el);
+  if (!socket || !activeChat) return;
+  clearTimeout(typingTimer);
+  if (activeChat.type === 'room') socket.emit('typing', { to: activeChat.name, isRoom: true });
+  else socket.emit('typing', { to: activeChat.name, isRoom: false });
+  typingTimer = setTimeout(() => {}, 2000);
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 110) + 'px';
+}
+
+function insertEmoji() {
+  const emojis = ['😊','👍','❤️','😂','🙏','😍','🎉','🤔','👋','✨','😎','🔥','💪','🎵'];
+  const input = document.getElementById('msgInput');
+  if (input) { input.value += emojis[Math.floor(Math.random()*emojis.length)]; input.focus(); }
+}
+
+function switchTab(t) {
+  currentTab = t;
+  document.getElementById('tabUsers').className = 'tab' + (t==='users'?' act':'');
+  document.getElementById('tabRooms').className = 'tab' + (t==='rooms'?' act':'');
+  renderList();
+}
+
+function doSearch(v) { renderList(); }
+
+function toggleDark() {
+  document.documentElement.toggleAttribute('data-dark');
+}
+
+function leaveApp() {
+  if (socket) socket.disconnect();
+  location.reload();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function getTime() {
+  return new Date().toLocaleTimeString('az-AZ',{hour:'2-digit',minute:'2-digit'});
+}
+</script>
+</body>
+</html>
